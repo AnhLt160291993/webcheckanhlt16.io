@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kiểm Soát Tài Sản Đảm Bảo / Dư Nợ</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f4f6f8;
+    }
+    h1 {
+      color: #2c3e50;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background-color: #fff;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #2980b9;
+      color: white;
+    }
+    input[type="number"], input[type="text"] {
+      width: 95%;
+      padding: 4px;
+    }
+    .alert {
+      color: red;
+      font-weight: bold;
+    }
+    button {
+      margin-top: 10px;
+      margin-right: 10px;
+      padding: 8px 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Chương Trình Kiểm Soát Tỷ Lệ Tài Sản Đảm Bảo / Dư Nợ</h1>
+  <p>Nhập hoặc tải dữ liệu để kiểm tra tỷ lệ an toàn vốn vay.</p>
+
+  <input type="file" id="csvFile" accept=".csv" />
+  <button onclick="readCSV()">📄 Đọc CSV</button>
+
+  <button onclick="addRow()">+ Thêm khách hàng</button>
+  <button onclick="calculateRatios()">🧮 Tính toán</button>
+
+  <table id="loanTable">
+    <thead>
+      <tr>
+        <th>Tên KH</th>
+        <th>Số CIF</th>
+        <th>XHTD</th>
+        <th>Phân loại nợ</th>
+        <th>Dư nợ vay</th>
+        <th>Dư nợ bảo lãnh đã nhân hệ số</th>
+        <th>Tổng giá trị tài sản</th>
+        <th>Sau khi nhân hệ số</th>
+        <th>Tỷ lệ ĐB/DN (%)</th>
+        <th>Trạng thái</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><input type="text" class="ten" /></td>
+        <td><input type="text" class="cif" /></td>
+        <td><input type="text" class="xhtd" /></td>
+        <td><input type="text" class="phanloai" /></td>
+        <td><input type="number" class="loan" /></td>
+        <td><input type="number" class="baolanh" /></td>
+        <td><input type="number" class="taisan" /></td>
+        <td><input type="number" class="ts_nhan_heso" /></td>
+        <td class="ratio">-</td>
+        <td class="status">-</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <script>
+    function addRow() {
+      const table = document.getElementById("loanTable").getElementsByTagName('tbody')[0];
+      const newRow = table.rows[0].cloneNode(true);
+      const inputs = newRow.getElementsByTagName('input');
+      for (let input of inputs) {
+        input.value = "";
+      }
+      newRow.querySelector(".ratio").textContent = "-";
+      newRow.querySelector(".status").textContent = "-";
+      table.appendChild(newRow);
+    }
+
+    function calculateRatios() {
+      const rows = document.querySelectorAll("#loanTable tbody tr");
+      rows.forEach(row => {
+        const duNoVay = parseFloat(row.querySelector(".loan").value) || 0;
+        const duNoBaoLanh = parseFloat(row.querySelector(".baolanh").value) || 0;
+        const tongTSNhanHeSo = parseFloat(row.querySelector(".ts_nhan_heso").value) || 0;
+        const tongDuNo = duNoVay + duNoBaoLanh;
+        const ratioCell = row.querySelector(".ratio");
+        const statusCell = row.querySelector(".status");
+
+        if (tongDuNo > 0 && tongTSNhanHeSo > 0) {
+          const ratio = (tongTSNhanHeSo / tongDuNo) * 100;
+          ratioCell.textContent = ratio.toFixed(2);
+          if (ratio >= 120) {
+            statusCell.textContent = "Đạt yêu cầu";
+            statusCell.classList.remove("alert");
+          } else {
+            statusCell.textContent = "Cảnh báo: Thấp";
+            statusCell.classList.add("alert");
+          }
+        } else {
+          ratioCell.textContent = "-";
+          statusCell.textContent = "Thiếu dữ liệu";
+          statusCell.classList.remove("alert");
+        }
+      });
+    }
+
+    function readCSV() {
+      const fileInput = document.getElementById("csvFile");
+      const file = fileInput.files[0];
+
+      if (!file) {
+        alert("Vui lòng chọn file CSV.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const text = e.target.result;
+        const rows = text.split('\n').map(row => row.split(','));
+        const table = document.querySelector("#loanTable tbody");
+        table.innerHTML = "";
+
+        for (let i = 1; i < rows.length; i++) {
+          const rowData = rows[i];
+          if (rowData.length < 8) continue;
+
+          const kh = {
+            ten: rowData[0],
+            cif: rowData[1],
+            xhtd: rowData[2],
+            phanloai: rowData[3],
+            duno_vay: parseFloat(rowData[4]) || 0,
+            duno_baolanh: parseFloat(rowData[5]) || 0,
+            taisan: parseFloat(rowData[6]) || 0,
+            ts_nhan_heso: parseFloat(rowData[7]) || 0
+          };
+
+          const duNoTong = kh.duno_vay + kh.duno_baolanh;
+          const ratio = duNoTong > 0 ? (kh.ts_nhan_heso / duNoTong) * 100 : 0;
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td><input type="text" class="ten" value="${kh.ten}" /></td>
+            <td><input type="text" class="cif" value="${kh.cif}" /></td>
+            <td><input type="text" class="xhtd" value="${kh.xhtd}" /></td>
+            <td><input type="text" class="phanloai" value="${kh.phanloai}" /></td>
+            <td><input type="number" class="loan" value="${kh.duno_vay}" /></td>
+            <td><input type="number" class="baolanh" value="${kh.duno_baolanh}" /></td>
+            <td><input type="number" class="taisan" value="${kh.taisan}" /></td>
+            <td><input type="number" class="ts_nhan_heso" value="${kh.ts_nhan_heso}" /></td>
+            <td class="ratio">${ratio.toFixed(2)}</td>
+            <td class="status">${ratio >= 120 ? "Đạt yêu cầu" : "Cảnh báo: Thấp"}</td>
+          `;
+          if (ratio < 120) tr.querySelector(".status").classList.add("alert");
+          table.appendChild(tr);
+        }
+      };
+
+      reader.readAsText(file);
+    }
+  </script>
+
+</body>
+</html>
